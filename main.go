@@ -1,34 +1,27 @@
-package main;
+package main
 
 import (
-	"flag"
 	"fmt"
-	"os"
-	"sync"
 )
 
+// simulate a task that takes time
+func doTask(id int, ch chan string) {
+	// Simulate work
+	ch <- fmt.Sprintf("Task %d completed", id)
+}
+
 func main() {
-	var numTasks int
-	flag.IntVar(&numTasks, "tasks", 1, "Number of concurrent tasks to run")
-	flag.Parse()
+	// Number of concurrent tasks
+	numTasks := 50
+	ch := make(chan string)
 
-	if numTasks < 1 || numTasks > 100 {
-		fmt.Println("Error: Number of tasks must be between 1 and 100")
-		os.Exit(1)
-	}
-
-	fmt.Printf("Starting %d concurrent tasks...\n", numTasks)
-
-	var wg sync.WaitGroup
-	wg.Add(numTasks)
-
+	// Launch goroutines
 	for i := 1; i <= numTasks; i++ {
-		go func(taskID int) {
-			defer wg.Done()
-			RunTask(taskID)
-		}(i)
+		go doTask(i, ch)
 	}
 
-	wg.Wait()
-	fmt.Println("All tasks completed.")
+	// Collect results
+	for i := 0; i < numTasks; i++ {
+		fmt.Println(<-ch)
+	}
 }
