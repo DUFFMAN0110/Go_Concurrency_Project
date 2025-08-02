@@ -9,7 +9,6 @@ func Authenticate(username, password string) bool {
 	if err != nil {
 		return false // User doesn't exist or query failed
 	}
-
 	// NOTE: Plaintext password check — not secure!
 	return dbPassword == password
 }

@@ -19,14 +19,14 @@ func handleConnection(conn net.Conn) {
 	defer conn.Close() // Ensure we close the connection when the function exits
 
 	reader := bufio.NewReader(conn)
-
+	
 	// Prompt client for a username
-	conn.Write([]byte("Username: "))
+	conn.Write([]byte("Username: \n"))
 	username, _ := reader.ReadString('\n')
 	username = strings.TrimSpace(username) // Remove newline or extra spaces
 
 	// Prompt for password
-	conn.Write([]byte("Password: "))
+	conn.Write([]byte("Password: \n"))
 	password, _ := reader.ReadString('\n')
 	password = strings.TrimSpace(password)
 
