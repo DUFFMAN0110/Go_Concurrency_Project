@@ -15,50 +15,148 @@ var (
 )
 
 // handleConnection manages an individual client's connection
-func handleConnection(conn net.Conn) {
-	defer conn.Close() // Ensure we close the connection when the function exits
+// func handleConnection(conn net.Conn) {
+// 	defer conn.Close() // Ensure we close the connection when the function exits
 
-	reader := bufio.NewReader(conn)
+// 	reader := bufio.NewReader(conn)
 	
-	// Prompt client for a username
-	conn.Write([]byte("Username: \n"))
-	username, _ := reader.ReadString('\n')
-	username = strings.TrimSpace(username) // Remove newline or extra spaces
+// 	// Prompt client for a username
+// 	conn.Write([]byte("Username: \n"))
+// 	username, _ := reader.ReadString('\n')
+// 	username = strings.TrimSpace(username) // Remove newline or extra spaces
 
-	// Prompt for password
-	conn.Write([]byte("Password: \n"))
-	password, _ := reader.ReadString('\n')
-	password = strings.TrimSpace(password)
+// 	// Prompt for password
+// 	conn.Write([]byte("Password: \n"))
+// 	password, _ := reader.ReadString('\n')
+// 	password = strings.TrimSpace(password)
 
-	// Authenticate the user against the database
-	if !Authenticate(username, password) {
-		conn.Write([]byte("Authentication failed\n"))
-		return // Stop handling this client if credentials are invalid
-	}
+// 	// Authenticate the user against the database
+// 	if !Authenticate(username, password) {
+// 		conn.Write([]byte("Authentication failed\n"))
+// 		return // Stop handling this client if credentials are invalid
+// 	}
 
-	// Add client to shared list
-	mu.Lock()
-	clients[conn] = username
-	mu.Unlock()
+// 	// Add client to shared list
+// 	mu.Lock()
+// 	clients[conn] = username
+// 	mu.Unlock()
 
-	// Notify others that a new user has joined
-	broadcast(fmt.Sprintf("%s joined the chat\n", username), conn)
+// 	// Notify others that a new user has joined
+// 	broadcast(fmt.Sprintf("%s joined the chat\n", username), conn)
 
-	// Main loop: listen for messages from this client
+// 	// Main loop: listen for messages from this client
+// 	for {
+// 		msg, err := reader.ReadString('\n')
+// 		if err != nil {
+// 			break // Exit loop if the client disconnects or causes an error
+// 		}
+// 		broadcast(fmt.Sprintf("[%s]: %s", username, msg), conn)
+// 	}
+
+// 	// Cleanup when client disconnects
+// 	mu.Lock()
+// 	delete(clients, conn)
+// 	mu.Unlock()
+// 	broadcast(fmt.Sprintf("%s left the chat\n", username), conn)
+// }
+
+/* 
+   handleMessages continuously listens for messages from a single connected user.
+   When a message is received, it is broadcast to all other connected clients.
+   If the client disconnects or an error occurs, it cleans up and notifies others.
+*/
+func handleMessages(conn net.Conn, reader *bufio.Reader, username string) {
 	for {
+		// Wait for the user to send a message
 		msg, err := reader.ReadString('\n')
 		if err != nil {
-			break // Exit loop if the client disconnects or causes an error
+			// Likely the client disconnected (e.g., Ctrl+C or closed terminal)
+			break
 		}
+
+		// Send the message to all other connected users
 		broadcast(fmt.Sprintf("[%s]: %s", username, msg), conn)
 	}
 
-	// Cleanup when client disconnects
+	// Cleanup: remove user and broadcast departure message
 	mu.Lock()
 	delete(clients, conn)
 	mu.Unlock()
+	
 	broadcast(fmt.Sprintf("%s left the chat\n", username), conn)
 }
+
+
+
+func handleConnection(conn net.Conn) {
+	defer conn.Close()
+	reader := bufio.NewReader(conn)
+
+	// Ask if user already has an account
+	conn.Write([]byte("Do you have an account? (yes/no): \n"))
+	choice, _ := reader.ReadString('\n')
+	choice = strings.ToLower(strings.TrimSpace(choice))
+
+	if choice == "yes" {
+		// Ask for credentials
+		conn.Write([]byte("Username:\n"))
+		username, _ := reader.ReadString('\n')
+		username = strings.TrimSpace(username)
+
+		conn.Write([]byte("Password:\n"))
+		password, _ := reader.ReadString('\n')
+		password = strings.TrimSpace(password)
+
+		if !Authenticate(username, password) {
+			conn.Write([]byte("Authentication failed.\n"))
+			return
+		}
+		conn.Write([]byte("Login successful. Welcome to the chat!\n"))
+
+		// Continue to chat loop...
+		mu.Lock()
+		clients[conn] = username
+		mu.Unlock()
+
+		broadcast(fmt.Sprintf("%s joined the chat\n", username), conn)
+		handleMessages(conn, reader, username)
+		return
+	}
+
+	if choice == "no" {
+		// Ask for username and check availability
+		conn.Write([]byte("Choose a username:\n"))
+		username, _ := reader.ReadString('\n')
+		username = strings.TrimSpace(username)
+
+		conn.Write([]byte("Choose a password:\n"))
+		password, _ := reader.ReadString('\n')
+		password = strings.TrimSpace(password)
+
+		if !CreateUser(username, password) {
+			conn.Write([]byte("Registration failed. Username may already exist.\n"))
+			return
+		}
+		conn.Write([]byte("Registration successful. You are now connected to the chat.\n"))
+
+		// Continue to chat loop...
+		mu.Lock()
+		clients[conn] = username
+		mu.Unlock()
+
+		broadcast(fmt.Sprintf("%s joined the chat\n", username), conn)
+		handleMessages(conn, reader, username)
+		return
+	}
+
+	// Handle invalid input
+	conn.Write([]byte("Invalid input. Please reconnect and enter yes or no.\n"))
+}
+
+
+
+
+
 
 // broadcast sends a message to all connected clients *except* the sender
 func broadcast(message string, sender net.Conn) {
