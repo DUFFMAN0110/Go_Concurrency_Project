@@ -1,27 +1,49 @@
 package main
 
 import (
-	"fmt"
+	"net/http"
+
+	"golang.org/x/net/websocket"
 )
 
-// simulate a task that takes time
-func doTask(id int, ch chan string) {
-	// Simulate work
-	ch <- fmt.Sprintf("Task %d completed", id)
+type Server struct {
+	conns map[*websocket.Conn] bool
 }
 
-func main() {
-	// Number of concurrent tasks
-	numTasks := 50
-	ch := make(chan string)
-
-	// Launch goroutines
-	for i := 1; i <= numTasks; i++ {
-		go doTask(i, ch)
+func NewServer() *Server {
+	return &Server{
+		conns: make(map[*websocket.Conn]bool)
 	}
+}
 
-	// Collect results
-	for i := 0; i < numTasks; i++ {
-		fmt.Println(<-ch)
+func (s *Server) handleWS(ws *websocket.Conn){
+	fmt.Println("new incoming connection from client:", ws.RemoteAddr())
+
+	s.conns[ws] = true
+
+	s.readLoop(ws)
+}
+
+func (s *Server) readLoop(ws *websocket.Conn){
+	buf := make([]byte, 1024)
+	for {
+		n, err := es.Read(buf)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			fmt.Println("read error:", err)
+			continue
+		}
+		msg := buff[:n]
+		fmt.Println(string(msg))
+		ws.Write([]byte("thank you for the msg!!!"))
+	
 	}
+}
+
+func main(){
+	server := NewServer()
+	http.Handle("/ws", websocket.Handler(server.handleWS))
+	http.ListenAndServe(":3000", nil) 
 }
