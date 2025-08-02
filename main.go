@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"io"
 	"net/http"
 
 	"golang.org/x/net/websocket"
@@ -12,7 +14,7 @@ type Server struct {
 
 func NewServer() *Server {
 	return &Server{
-		conns: make(map[*websocket.Conn]bool)
+		conns: make(map[*websocket.Conn]bool),
 	}
 }
 
@@ -27,7 +29,7 @@ func (s *Server) handleWS(ws *websocket.Conn){
 func (s *Server) readLoop(ws *websocket.Conn){
 	buf := make([]byte, 1024)
 	for {
-		n, err := es.Read(buf)
+		n, err := ws.Read(buf)
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -35,7 +37,7 @@ func (s *Server) readLoop(ws *websocket.Conn){
 			fmt.Println("read error:", err)
 			continue
 		}
-		msg := buff[:n]
+		msg := buf[:n]
 		fmt.Println(string(msg))
 		ws.Write([]byte("thank you for the msg!!!"))
 	
