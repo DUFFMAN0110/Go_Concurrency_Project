@@ -12,7 +12,7 @@ func doTask(id int, ch chan string) {
 
 func main() {
 	// Number of concurrent tasks
-	numTasks := 300
+	numTasks := 50
 	ch := make(chan string)
 
 	// Launch goroutines
