@@ -47,5 +47,5 @@ func (s *Server) readLoop(ws *websocket.Conn){
 func main(){
 	server := NewServer()
 	http.Handle("/ws", websocket.Handler(server.handleWS))
-	http.ListenAndServe(":3000", nil) 
+	http.ListenAndServe(":8000", nil) 
 }
