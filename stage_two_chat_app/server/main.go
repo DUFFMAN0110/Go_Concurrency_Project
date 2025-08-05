@@ -14,52 +14,6 @@ var (
 	mu      sync.Mutex // Used to lock access to clients during read/write
 )
 
-// handleConnection manages an individual client's connection
-// func handleConnection(conn net.Conn) {
-// 	defer conn.Close() // Ensure we close the connection when the function exits
-
-// 	reader := bufio.NewReader(conn)
-	
-// 	// Prompt client for a username
-// 	conn.Write([]byte("Username: \n"))
-// 	username, _ := reader.ReadString('\n')
-// 	username = strings.TrimSpace(username) // Remove newline or extra spaces
-
-// 	// Prompt for password
-// 	conn.Write([]byte("Password: \n"))
-// 	password, _ := reader.ReadString('\n')
-// 	password = strings.TrimSpace(password)
-
-// 	// Authenticate the user against the database
-// 	if !Authenticate(username, password) {
-// 		conn.Write([]byte("Authentication failed\n"))
-// 		return // Stop handling this client if credentials are invalid
-// 	}
-
-// 	// Add client to shared list
-// 	mu.Lock()
-// 	clients[conn] = username
-// 	mu.Unlock()
-
-// 	// Notify others that a new user has joined
-// 	broadcast(fmt.Sprintf("%s joined the chat\n", username), conn)
-
-// 	// Main loop: listen for messages from this client
-// 	for {
-// 		msg, err := reader.ReadString('\n')
-// 		if err != nil {
-// 			break // Exit loop if the client disconnects or causes an error
-// 		}
-// 		broadcast(fmt.Sprintf("[%s]: %s", username, msg), conn)
-// 	}
-
-// 	// Cleanup when client disconnects
-// 	mu.Lock()
-// 	delete(clients, conn)
-// 	mu.Unlock()
-// 	broadcast(fmt.Sprintf("%s left the chat\n", username), conn)
-// }
-
 /* 
    handleMessages continuously listens for messages from a single connected user.
    When a message is received, it is broadcast to all other connected clients.
