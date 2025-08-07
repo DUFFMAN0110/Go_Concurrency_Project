@@ -11,7 +11,4 @@
 - add to where the client can see that they are typing -> basically adding a \[You\]
 - add to where there is a /help command and when someone joins the server, it shows all the important commands
 - add to where it logs chat history, that way when someone joins a chat, they can see the previous conversations
-- add case-INsensitive usernames
-- add byte encryted passwords
-- after a user's authentification fails after a set number of, quit the connection currently doesn't do that
-- fix the invalid input, make sure it loops until input is valid (case insensitive)
+
