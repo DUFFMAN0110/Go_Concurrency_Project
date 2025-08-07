@@ -2,7 +2,7 @@ package main
 
 import (
 	"bufio" // Used to read text line-by-line from client connections
-	"fmt"
+	"fmt"	// used for printing to the terminal 
 	"net"     // Provides TCP networking support
 	"strings" // Used to trim user input
 	"sync"    // Provides sync.Mutex for safe concurrent access to shared data
@@ -12,6 +12,8 @@ import (
 var (
 	clients = make(map[net.Conn]string) // Tracks connected clients by their connection
 	mu      sync.Mutex // Used to lock access to clients during read/write
+	chatHistory []string
+	historyLock sync.Mutex
 )
 
 
@@ -30,20 +32,22 @@ func handleMessages(conn net.Conn, reader *bufio.Reader, username string) {
 			// If there's an error (likely user disconnected), break the loop
 			break
 		}
+		finalMsg := fmt.Sprintf("[%s]: %s", username, msg)
+
+		// save message to chat history
+		historyLock.Lock()
+		chatHistory = append(chatHistory, strings.TrimRight(finalMsg,"\n"))
+		historyLock.Unlock()
+
 
 		// Broadcast the message to all other connected clients
 		// Use the actual username in the broadcasted message (not "[You]")
-		broadcast(fmt.Sprintf("[%s]: %s", username, msg), conn)
+		broadcast(finalMsg, conn)
 	}
 
 	// If we get here, the user has disconnected or an error occurred
 	// Clean up: remove the client from the shared clients map
-	mu.Lock()
-	delete(clients, conn)
-	mu.Unlock()
-
-	// Notify other users that this user left the chat
-	broadcast(fmt.Sprintf("%s left the chat\n", username), conn)
+	disconnectClient(conn)
 }
 
 func disconnectClient(conn net.Conn) {
@@ -51,6 +55,8 @@ func disconnectClient(conn net.Conn) {
 	if username, ok := clients[conn]; ok {
 		delete(clients, conn)
 		mu.Unlock()
+		
+		// Notify other users that this user left the chat
 		broadcast(fmt.Sprintf("%s left the chat\n", username), conn)
 	} else {
 		mu.Unlock()
@@ -61,7 +67,6 @@ func disconnectClient(conn net.Conn) {
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
 	reader := bufio.NewReader(conn)
-	
 	var choice string
 	
 	// Ask if user already has an account (loop until valid yes/no input)
@@ -77,7 +82,7 @@ func handleConnection(conn net.Conn) {
 		}
 		conn.Write([]byte("Invalid input. Please type 'yes' or 'no'.\n"))
 	}
-	
+
 
 	if choice == "yes" {
 		// Ask for credentials, authenticate, if after 5 authentification attempts
@@ -90,6 +95,15 @@ func handleConnection(conn net.Conn) {
 			conn.Write([]byte("Username:\n"))
 			u, _ := reader.ReadString('\n')
 			username = strings.TrimSpace(u)
+			
+			if isUserOnline(username) {
+				conn.Write([]byte(fmt.Sprintf("This user is already logged in elsewhere. Attempts left: %d\n", maxAttempts-attempts)))
+				if attempts == maxAttempts{
+					break
+				}else{
+					continue
+				}
+			}
 
 			conn.Write([]byte("Password:\n"))
 			p, _ := reader.ReadString('\n')
@@ -111,25 +125,35 @@ func handleConnection(conn net.Conn) {
 
 		conn.Write([]byte("Login successful. Welcome to the chat!\n"))
 
-		sendWelcomeMessage(conn)
-		
+		// actually add the user to the map of users
 		mu.Lock()
 		clients[conn] = username
 		mu.Unlock()
+		
+		// send info 
+		sendWelcomeMessage(conn)
+		sendChatHistory(conn)
+		
 		
 		// broadcast to the other users which user joined the connection
 		broadcast(fmt.Sprintf("%s joined the chat\n", username), conn)
 		handleMessages(conn, reader, username)
 
-		return
+		// return
 
 	} else if choice == "no" {
+		
 		for{
 			// Ask for username and check availability
 			conn.Write([]byte("Choose a username:\n"))
 			username, _ := reader.ReadString('\n')
 			username = strings.TrimSpace(username)
-
+			
+			// checks if the username is an empty string, 
+			if username == "" || len(username) < 1{
+				conn.Write([]byte("This username is too short. Try a different one\n"))
+				continue
+			}
 			conn.Write([]byte("Choose a password (must be at least 5 characters):\n"))
 			password, _ := reader.ReadString('\n')
 			password = strings.TrimSpace(password)
@@ -138,25 +162,52 @@ func handleConnection(conn net.Conn) {
 			if CreateUser(username, password) {
 				conn.Write([]byte("Registration successful. You are now connected to the chat.\n"))
 				
-				sendWelcomeMessage(conn)
-
-				// Continue to chat loop...
+				// actually add the user to the map of users
 				mu.Lock()
 				clients[conn] = username
-				fmt.Printf("User %s connected. Total clients: %d\n", username, len(clients))
 				mu.Unlock()
-
-				//Show who has joined the chat
+				
+				// send info 
+				sendWelcomeMessage(conn)
+				sendChatHistory(conn)
+				
+				
+				// broadcast to the other users which user joined the connection
 				broadcast(fmt.Sprintf("%s joined the chat\n", username), conn)
 				handleMessages(conn, reader, username)
-				return
 			}
-		
-			conn.Write([]byte("Registration failed. Username may already exist or password is too short (minimum 5 characters).\n"))
+			
+			conn.Write([]byte("Registration failed. Username may already exist, your password may be incorrect, or password is too short (minimum 5 characters).\n"))
 		}
 	
 		
 	}
+}
+
+func isUserOnline(username string) bool {
+	mu.Lock()
+	defer mu.Unlock()
+	for _, name := range clients {
+		if strings.EqualFold(name, username) {
+			return true
+		}
+	}
+	return false
+}
+
+func sendChatHistory(conn net.Conn){
+	historyLock.Lock()
+	defer historyLock.Unlock()
+
+	if len(chatHistory) == 0{
+		return
+	}
+
+	conn.Write([]byte("----- Chat History -----\n"))
+	for _, msg := range chatHistory{
+		conn.Write([]byte(msg + "\n"))
+	}
+	conn.Write([]byte("------------------------\n"))
 }
 
 func sendWelcomeMessage(conn net.Conn){
@@ -171,6 +222,8 @@ Enjoy your stay!
 `
 	conn.Write([]byte(msg))
 }
+
+
 // broadcast sends a message to all connected clients *except* the sender
 func broadcast(message string, sender net.Conn) {
 	mu.Lock()

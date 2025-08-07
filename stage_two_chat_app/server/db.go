@@ -37,7 +37,7 @@ func StartDB() {
 	fmt.Println("Database initialized.")
 
 	// Add default user if missing users
-	CreateUser("z", "z")
+	CreateUser("z", "z12345678")
 }
 
 /*
@@ -48,10 +48,13 @@ func StartDB() {
 
 func CreateUser(username, password string) bool {
 
-	username = strings.ToLower(username) // make the username lowercase
+	username = strings.ToLower(strings.TrimSpace(username)) // make the username lowercase
+
+	if username == "" || len(username) < 1{
+		return false
+	}
 	//Checks if the username already exists
 	if len(password) < 5{
-		fmt.Println("Error: Password must be at least 8 characters long.")
 		return false
 	}
 
