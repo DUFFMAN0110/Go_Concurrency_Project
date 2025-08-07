@@ -1,3 +1,5 @@
 stage_two_chat_app/server/users.db
-*/go.sum
-go.sum
+
+stage_two_chat_app/server/go.sum
+
+stage_two_chat_app/client/go.sum
