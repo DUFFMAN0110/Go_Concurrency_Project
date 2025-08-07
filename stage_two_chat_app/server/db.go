@@ -4,8 +4,10 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
+	"golang.org/x/crypto/bcrypt"
 )
 
 var db *sql.DB // Global DB instance used throughout server
@@ -34,42 +36,9 @@ func StartDB() {
 
 	fmt.Println("Database initialized.")
 
-	// Add default users if missing
-	CreateUser("alice", "password123")
-	CreateUser("bob", "secure456")
+	// Add default user if missing users
+	CreateUser("z", "z")
 }
-
-// // createUser inserts a new user into the database if they don't already exist
-// func createUser(username, password string) {
-// 	var exists int
-
-// 	// Check if username already exists
-// 	err := db.QueryRow("SELECT COUNT(*) FROM users WHERE username = ?", username).Scan(&exists)
-// 	if err != nil {
-// 		log.Println("User check error:", err)
-// 		return
-// 	}
-
-// 	if exists > 0 {
-// 		return // Skip creating the user if they already exist
-// 	}
-
-// 	// Insert user
-// 	stmt, err := db.Prepare("INSERT INTO users(username, password) VALUES (?, ?)")
-// 	if err != nil {
-// 		log.Println("Statement preparation failed:", err)
-// 		return
-// 	}
-// 	defer stmt.Close()
-
-// 	_, err = stmt.Exec(username, password)
-// 	if err != nil {
-// 		log.Println("Insert failed:", err)
-// 	} else {
-// 		fmt.Printf("User '%s' created.\n", username)
-// 	}
-// }
-
 
 /*
    CreateUser attempts to register a new user in the database with the given username and password.
@@ -78,9 +47,14 @@ func StartDB() {
 */
 
 func CreateUser(username, password string) bool {
-	//Checks if the username already exists
 
-	//Declare a variable to store the count result from the query
+	username = strings.ToLower(username) // make the username lowercase
+	//Checks if the username already exists
+	if len(password) < 5{
+		fmt.Println("Error: Password must be at least 8 characters long.")
+		return false
+	}
+
 	var exists int
 
 	// Run a query to count how many users exist with the given username
@@ -97,7 +71,11 @@ func CreateUser(username, password string) bool {
 		return false
 	}
 
-	// === Step 2: Insert the new user into the database ===
+	// Hash the password securely with bcrypt
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		fmt.Print("Error hasing password:", err)
+	}
 
 	// Prepare a SQL statement for inserting the new user
 	stmt, err := db.Prepare("INSERT INTO users(username, password) VALUES (?, ?)")
@@ -111,7 +89,7 @@ func CreateUser(username, password string) bool {
 	defer stmt.Close() // Ensure we close the statement no matter what (best practice)
 
 	// Execute the INSERT statement with the provided username and password
-	_, err = stmt.Exec(username, password)
+	_, err = stmt.Exec(username, string(hashed))
 
 	if err != nil {
 		// If executing the insert fails (e.g., DB constraint error), return false
@@ -119,7 +97,6 @@ func CreateUser(username, password string) bool {
 		return false
 	}
 
-	// === Registration successful ===
+	// Registration successful, user created
 	return true
 }
-
